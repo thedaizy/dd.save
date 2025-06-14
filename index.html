@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>dd.ssd – Public</title>
+<title>dd.hdd</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Orbit&display=swap" rel="stylesheet">
 <style>
@@ -21,6 +21,7 @@ body{
   height:100vh;
   overflow:hidden;
 }
+
 /* ── sidebar ─────────────────────────── */
 #sidebar{
   width:var(--sidebar-w);
@@ -35,10 +36,15 @@ body{
 #logo img.second{position:absolute;top:0;left:0;visibility:hidden;}
 #logo:hover img.first{visibility:hidden;}
 #logo:hover img.second{visibility:visible;}
+
 /* ── tree list ───────────────────────── */
 #tree{list-style:none;margin:0;padding:0;}
 li{display:block;}
-.row{display:flex;align-items:center;gap:6px;padding:4px 2px;user-select:none;}
+.row{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 2px;
+  user-select:none;
+}
 .row:hover{background:#111;cursor:pointer;}
 .icon img{width:16px;height:auto;display:block;}
 .name{white-space:pre;}
@@ -49,29 +55,32 @@ li{display:block;}
 li.active-folder .name{text-decoration:underline;text-decoration-color:var(--u-folder);}
 li.active-file   .name{text-decoration:underline;text-decoration-color:var(--u-file);}
 li.folder>.row>.name::after{content:'/';}
+
 /* ── editor ─────────────────────────── */
 #editor{flex:1;display:flex;flex-direction:column;min-width:0;}
+/* filename bar */
 #pathbar{
   display:flex;align-items:center;gap:6px;
   padding:8px 12px;
   border-bottom:2px solid var(--border);
 }
-#filepath{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#copyBtn{
-  flex-shrink:0;
-  border:none;
-  background:transparent;
-  cursor:pointer;
-  padding:0;
+#filepath{
+  max-width:calc(100% - 22px);  /* leave room for the icon */
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-#copyBtn img{width:14px;height:auto;display:block;filter:invert(1);}
+#copyBtn{
+  border:none;background:transparent;cursor:pointer;padding:0;
+  width:14px;height:14px;flex-shrink:0;
+}
+#copyBtn img{width:14px;height:14px;display:block;}   /* no filter → original colors */
 #copyBtn:active{transform:scale(.9);}
-#copied{margin-left:6px;color:#2eebea;display:none;}
+#copied{margin-left:6px;color:#2eebea;display:none;font-weight:bold;}
 #textArea{
   flex:1;width:100%;background:var(--panel);color:var(--txt);
   font-family:inherit;font-size:8px;border:none;resize:none;
   padding:12px;outline:none;
 }
+
 /* ── responsive ─────────────────────── */
 @media(max-width:600px){
   body{flex-direction:column;font-size:10px;}
@@ -100,7 +109,7 @@ li.folder>.row>.name::after{content:'/';}
     <!-- filename + copy button -->
     <div id="pathbar">
       <span id="filepath"></span>
-      <button id="copyBtn" title="Copy to clipboard">
+      <button id="copyBtn" title="Copy text">
         <img src="copy.svg" alt="copy">
       </button>
       <span id="copied">✔</span>
@@ -118,11 +127,11 @@ const copyBtn = document.getElementById('copyBtn');
 const copied  = document.getElementById('copied');
 
 /* helpers */
-const sizeHuman=b=>{if(b<1024)return b+' B';const u=['KB','MB','GB'];let i=-1;do{b/=1024;++i;}while(b>=1024&&i<u.length-1);return b.toFixed(i?1:0)+' '+u[i];};
-const fmtDate = t=>{try{return new Date(t).toLocaleString();}catch{return t};};
+const sizeH=b=>{if(b<1024)return b+' B';const u=['KB','MB','GB'];let i=-1;do{b/=1024;++i;}while(b>=1024&&i<u.length-1);return b.toFixed(i?1:0)+' '+u[i];};
+const fmt   =t=>{try{return new Date(t).toLocaleString();}catch{return t};};
 
 async function init(){
-  const res=await fetch('files.json'); window.data=await res.json(); render();
+  const r=await fetch('files.json'); window.data=await r.json(); render();
 }
 function render(){tree.innerHTML='';data.forEach(n=>tree.appendChild(node(n,'')));}
 
@@ -130,35 +139,34 @@ function node(o,base){
   const li=document.createElement('li');li.className=o.type;
   const row=document.createElement('div');row.className='row';li.appendChild(row);
   const path=base?`${base}/${o.name}`:o.name;
-  row.innerHTML=`<span class="icon"><img src="${o.type==='folder'?'folder.svg':'file.svg'}"></span><span class="name">${o.name}</span>`;
+  row.innerHTML=
+    `<span class="icon"><img src="${o.type==='folder'?'folder.svg':'file.svg'}"></span>
+     <span class="name">${o.name}</span>`;
   if(o.type==='folder'){
     const ul=document.createElement('ul');ul.className='nest hidden';
     o.children.forEach(c=>ul.appendChild(node(c,path)));li.appendChild(ul);
-    row.onclick=()=>{ul.classList.toggle('hidden');setActive(li,'folder');};
+    row.onclick=()=>{ul.classList.toggle('hidden');setAct(li,'folder');};
   }else{
-    row.insertAdjacentHTML('beforeend',`<span class="size">${sizeHuman(o.size||0)}</span>`);
-    const m=document.createElement('div');m.className='meta';m.textContent=fmtDate(o.time||'');li.appendChild(m);
-    row.onclick=()=>{
-      ta.disabled=false;
-      ta.value=o.content||'';
-      fpBox.textContent=path;
-      setActive(li,'file');
-    };
+    row.insertAdjacentHTML('beforeend',`<span class="size">${sizeH(o.size||0)}</span>`);
+    const m=document.createElement('div');m.className='meta';m.textContent=fmt(o.time||'');li.appendChild(m);
+    row.onclick=()=>{ta.disabled=false;ta.value=o.content||'';fpBox.textContent=path;setAct(li,'file');};
   }
   return li;
 }
-function setActive(li,k){document.querySelectorAll('#tree li.active-folder,#tree li.active-file').forEach(el=>el.classList.remove('active-folder','active-file'));li.classList.add(k==='folder'?'active-folder':'active-file');}
+function setAct(li,k){
+  document.querySelectorAll('#tree li.active-folder,#tree li.active-file')
+          .forEach(el=>el.classList.remove('active-folder','active-file'));
+  li.classList.add(k==='folder'?'active-folder':'active-file');
+}
 
-/* copy clipboard */
+/* clipboard */
 copyBtn.onclick=async()=>{
   if(ta.disabled) return;
   try{
     await navigator.clipboard.writeText(ta.value);
     copied.style.display='inline';
     setTimeout(()=>copied.style.display='none',1500);
-  }catch(e){
-    alert('Clipboard failed');
-  }
+  }catch{alert('Copy failed');}
 };
 
 init();
