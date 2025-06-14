@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>dd.save – Public</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Orbit&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000;            /* pure black everywhere */
+  --panel:#000;
+  --border:#222;
+  --txt:#fff;
+  --u-folder:#44db74;
+  --u-file:#2eebea;
+  --meta:#888;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Orbit',monospace;
+  font-size:8px;
+  background:var(--bg);
+  color:var(--txt);
+  display:flex;
+  height:100vh;
+}
+/* ── sidebar ─────────────────────────── */
+#sidebar{
+  width:320px;
+  border-right:2px solid var(--border);
+  background:var(--panel);
+  overflow:auto;
+  padding:12px;
+}
+/* logo swap (instant, no layout shift) */
+#logo{position:relative;width:64px;height:auto;margin-bottom:8px;}
+#logo img{width:64px;height:auto;display:block;}
+#logo img.second{position:absolute;top:0;left:0;visibility:hidden;}
+#logo:hover img.first{visibility:hidden;}
+#logo:hover img.second{visibility:visible;}
+/* ── tree list ───────────────────────── */
+#tree{list-style:none;margin:0;padding:0;}
+li{display:block;}
+.row{display:flex;align-items:center;gap:6px;padding:4px 2px;user-select:none;}
+.row:hover{background:#111;cursor:pointer;}
+.icon img{width:16px;height:auto;display:block;}
+.name{white-space:pre;}
+.size{margin-left:auto;}
+.meta{color:var(--meta);padding-left:22px;padding-top:2px;}
+.nest>li>.row::before{content:"-------> ";color:#555;}
+.hidden{display:none;}
+li.active-folder .name{text-decoration:underline;text-decoration-color:var(--u-folder);}
+li.active-file   .name{text-decoration:underline;text-decoration-color:var(--u-file);}
+li.folder>.row>.name::after{content:'/';}
+/* ── editor pane ─────────────────────── */
+#editor{flex:1;display:flex;flex-direction:column;}
+#path{padding:8px 12px;}
+#textArea{
+  flex:1;width:100%;background:var(--panel);color:var(--txt);
+  font-family:inherit;font-size:8px;border:none;resize:none;padding:12px;outline:none;
+}
+</style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <!-- logo block -->
+    <div id="logo">
+      <img src="logo.svg"  alt="logo"  class="first">
+      <img src="logo2.svg" alt="logo2" class="second">
+    </div>
+
+    <ul id="tree"></ul>
+  </div>
+
+  <div id="editor">
+    <div id="path"></div>
+    <textarea id="textArea" placeholder="SELECT A FILE TO READ…" readonly disabled></textarea>
+  </div>
+
+<script>
+/* ── constants ───────────────────────── */
+const tree   = document.getElementById('tree');
+const ta     = document.getElementById('textArea');
+const pathBx = document.getElementById('path');
+
+/* helpers */
+const human = b=>{if(b<1024)return b+' B';const u=['KB','MB','GB'];let i=-1;do{b/=1024;++i;}while(b>=1024&&i<u.length-1);return b.toFixed(i?1:0)+' '+u[i];};
+const fmt   = t=>{try{return new Date(t).toLocaleString();}catch{return t};};
+
+/* build tree */
+async function init(){
+  const res=await fetch('files.json'); window.data=await res.json(); render();
+}
+function render(){tree.innerHTML='';data.forEach(n=>tree.appendChild(node(n,'')));}
+function node(obj,base){
+  const li=document.createElement('li');li.className=obj.type;
+  const row=document.createElement('div');row.className='row';li.appendChild(row);
+  const p=base?`${base}/${obj.name}`:obj.name;
+
+  row.innerHTML=
+    `<span class="icon"><img src="${obj.type==='folder'?'folder.svg':'file.svg'}"></span>
+     <span class="name">${obj.name}</span>`;
+
+  if(obj.type==='folder'){
+    const ul=document.createElement('ul');ul.className='nest hidden';
+    obj.children.forEach(c=>ul.appendChild(node(c,p)));li.appendChild(ul);
+    row.onclick=()=>{ul.classList.toggle('hidden');setActive(li,'folder');};
+  }else{
+    row.insertAdjacentHTML('beforeend',`<span class="size">${human(obj.size||0)}</span>`);
+    const meta=document.createElement('div');meta.className='meta';meta.textContent=fmt(obj.time||'');li.appendChild(meta);
+    row.onclick=()=>{ta.disabled=false;ta.value=obj.content||'';pathBx.textContent=p;setActive(li,'file');};
+  }
+  return li;
+}
+function setActive(li,k){document.querySelectorAll('#tree li.active-folder,#tree li.active-file').forEach(el=>el.classList.remove('active-folder','active-file'));li.classList.add(k==='folder'?'active-folder':'active-file');}
+init();
+</script>
+</body>
+</html>
